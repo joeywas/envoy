@@ -3,86 +3,43 @@ name: Windows Envoy Build (GitHub-Hosted Optimization)
 on: [push]
 
 jobs:
-  build-windows:
-    runs-on: windows-2022
+  build-windows-docker:
+    # Crucial: Must run on Ubuntu because run_envoy_docker.sh expects a Linux Docker host
+    runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@main
 
-      - name: Configure Git for Long Paths
-        run: |
-          git config --global core.longpaths true
-
-      # FIX 1: Maximize runner disk space by purging massive pre-installed packages
-      - name: Free Disk Space
-        shell: powershell
-        run: |
-          Write-Host "Initial disk space:"
-          Get-PSDrive C
-          # Remove heavy standard image components not needed for Envoy C++ compilation
-          Remove-Item -Recurse -Force "C:\Program Files\Android" -ErrorAction SilentlyContinue
-          Remove-Item -Recurse -Force "C:\Microsoft" -ErrorAction SilentlyContinue
-          Write-Host "Post-cleanup disk space:"
-          Get-PSDrive C
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Bazelisk
-        run: |
-          choco install bazelisk
-
-      # FIX 3: Cache Bazel builds to prevent 6-hour job timeouts on weak hardware
-      - name: Bazel Cache
+      # Optimization: Cache the internal Bazel cache generated inside the Linux Docker container
+      - name: Bazel Docker Cache
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/bazel
-            C:/_bazel_runner
-          key: ${{ runner.os }}-bazel-${{ hashFiles('**/REPOSITORY.bzl', '**/*.bazelrc') }}
+          key: ${{ runner.os }}-envoy-docker-bazel-${{ hashFiles('**/REPOSITORY.bzl', '**/*.bazelrc') }}
           restore-keys: |
-            ${{ runner.os }}-bazel-
+            ${{ runner.os }}-envoy-docker-bazel-
 
-      - name: Build Envoy Binary
+      - name: Build Envoy for Windows via CI Docker Script
         shell: bash
         env:
-          BAZEL_VC: "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC"
-          BAZEL_OUTPUT_BASE: "C:/_b"
+          # Fix for standard GitHub runner resources to fit within 7GB RAM
+          BAZEL_BUILD_EXTRA_OPTIONS: "--local_resources=memory=5120 --local_resources=cpu=2 --jobs=2"
         run: |
-          # 1. Generate a clean mock directory structure for the toolshed framework
-          mkdir -p C:/stub_toolshed/dependency
-          mkdir -p C:/stub_toolshed/compile
-          mkdir -p C:/stub_toolshed/repository
-          mkdir -p C:/stub_toolshed/toolchains
+          # 1. Ensure the script is executable in the runner context
+          chmod +x ./ci/run_envoy_docker.sh
+          chmod +x ./ci/windows_ci_steps.sh
 
-          # 2. Write structural workspace metadata files
-          touch C:/stub_toolshed/REPO.bazel
-          touch C:/stub_toolshed/BUILD
-          touch C:/stub_toolshed/dependency/BUILD
-          touch C:/stub_toolshed/compile/BUILD
-          touch C:/stub_toolshed/repository/BUILD
-          touch C:/stub_toolshed/toolchains/BUILD
+          # 2. Execute the official Dockerized wrapper command
+          ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 
-          # 3. Stream dummy functions using single echo lines to bypass YAML string boundaries
-          echo "def json_data(**kwargs): pass" > C:/stub_toolshed/macros.bzl
-          echo "def json_merge(**kwargs): pass" > C:/stub_toolshed/repository/utils.bzl
-          echo "def arch_alias(**kwargs): return 'x86_64'" >> C:/stub_toolshed/repository/utils.bzl
-          echo "def updater(**kwargs): pass" > C:/stub_toolshed/dependency/macros.bzl
-          echo "def setup_sanitizer_libs(**kwargs): pass" > C:/stub_toolshed/compile/sanitizer_libs.bzl
-          echo "def utils(**kwargs): pass" > C:/stub_toolshed/toolchains/utils.bzl
-
-          # 4. CRITICAL: Inject a global command override into the root .bazelrc
-          # This forces Envoy's WORKSPACE logic to look at our C:/stub_toolshed local directory
-          echo "common --override_repository=envoy_toolshed=C:/stub_toolshed" >> .bazelrc
-
-          # 5. Execute the build directly (Skip 'fetch' since the override makes it unnecessary)
-          echo "Starting the build..."
-          bazel --output_base="$BAZEL_OUTPUT_BASE" build \
-            -c opt \
-            --enable_platform_specific_config \
-            --local_resources=memory=5120 \
-            --local_resources=cpu=2 \
-            --jobs=2 \
-            //source/exe:envoy-static
+      - name: Upload Windows Envoy Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: envoy-windows-binary
+          # Look inside the newly generated build output directory for the compiled .exe file
+          path: |
+            **/envoy.exe
+            **/envoy-static.exe
+          if-no-files-found: warn
