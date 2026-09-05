@@ -1,0 +1,24 @@
+name: Windows Envoy Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure Git for Long Paths
+        run: |
+          git config --global core.longpaths true
+
+      - name: Run Envoy Windows CI Build Container
+        shell: bash
+        run: |
+          # Executes Envoy's native Windows building script via Docker
+          ./ci/windows_ci_steps.sh
