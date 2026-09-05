@@ -49,15 +49,12 @@ jobs:
         shell: cmd
         env:
           BAZEL_VC: "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC"
-          # Direct Bazel to create its heavy build directory on the freshly cleared root drive
           BAZEL_OUTPUT_BASE: "C:\\_bazel_runner"
         run: |
           python tools/github/write_current_source_version.py
-          
-          # FIX 2: Restrict resource consumption strictly to fit inside 7GB RAM / 2 vCPUs
           bazel --output_base="%BAZEL_OUTPUT_BASE%" build ^
             -c opt ^
-            --config=windows ^
+            --enable_platform_specific_config ^
             --local_ram_resources=5120 ^
             --local_cpu_resources=2 ^
             --jobs=2 ^
