@@ -19,6 +19,9 @@ jobs:
 
       - name: Run Envoy Windows CI Build Container
         shell: bash
+        env:
+          # This overrides the script's internal default fallback (--config=msvc-cl)
+          BAZEL_BUILD_EXTRA_OPTIONS: "--config=windows"
         run: |
           # Executes Envoy's native Windows building script via Docker
           ./ci/windows_ci_steps.sh
