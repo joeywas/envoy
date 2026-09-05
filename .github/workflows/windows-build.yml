@@ -1,37 +1,28 @@
-name: Windows Envoy Build (GitHub-Hosted Optimization)
+name: Windows Envoy Build via Container
 
 on: [push]
 
 jobs:
   build-windows-docker:
-    # Crucial: Must run on Ubuntu because run_envoy_docker.sh expects a Linux Docker host
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     
     steps:
       - name: Checkout Repository
         uses: actions/checkout@main
 
-      # Optimization: Cache the internal Bazel cache generated inside the Linux Docker container
-      - name: Bazel Docker Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/bazel
-          key: ${{ runner.os }}-envoy-docker-bazel-${{ hashFiles('**/REPOSITORY.bzl', '**/*.bazelrc') }}
-          restore-keys: |
-            ${{ runner.os }}-envoy-docker-bazel-
-
+      # CRITICAL: Forces the GitHub Action host runner to switch Docker into Windows Container mode
+      - name: Switch Docker to Windows Containers
+        shell: powershell
+        run: |
+          & "C:\Program Files\Docker\Docker\DockerCli.exe" -SwitchDaemon
+          
       - name: Build Envoy for Windows via CI Docker Script
         shell: bash
         env:
           # Fix for standard GitHub runner resources to fit within 7GB RAM
           BAZEL_BUILD_EXTRA_OPTIONS: "--local_resources=memory=5120 --local_resources=cpu=2 --jobs=2"
         run: |
-          # 1. Ensure the script is executable in the runner context
-          chmod +x ./ci/run_envoy_docker.sh
-          chmod +x ./ci/windows_ci_steps.sh
-
-          # 2. Execute the official Dockerized wrapper command
+          # 1. Execute the official Dockerized wrapper command
           ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 
       - name: Upload Windows Envoy Binary Artifact
