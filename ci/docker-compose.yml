@@ -1,6 +1,7 @@
 x-envoy-build-base: &envoy-build-base
   image: >-
     ${ENVOY_BUILD_IMAGE:?ERROR: ENVOY_BUILD_IMAGE is not set! either set it in your environment or use ci/run_envoy_docker.sh to set it}
+  isolation: hyperv
   cpus: ${ENVOY_DOCKER_CPUS:-0}
   user: root:root
   working_dir: ${ENVOY_DOCKER_SOURCE_DIR:-/source}
