@@ -9,18 +9,16 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@main
-
-      # CRITICAL: Forces the GitHub Action host runner to switch Docker into Windows Container mode
-      - name: Switch Docker to Windows Containers
-        shell: powershell
-        run: |
-          & "C:\Program Files\Docker\Docker\DockerCli.exe" -SwitchDaemon
-          
+         
       - name: Build Envoy for Windows via CI Docker Script
         shell: bash
         env:
           # Fix for standard GitHub runner resources to fit within 7GB RAM
           BAZEL_BUILD_EXTRA_OPTIONS: "--local_resources=memory=5120 --local_resources=cpu=2 --jobs=2"
+          # CRITICAL: Forces MSYS2 to pass raw Windows drive paths straight to the docker CLI
+          # without breaking them down into Unix path definitions
+          MSYS_NO_PATHCONV: "1"
+          COMPOSE_CONVERT_WINDOWS_PATHS: "1"
         run: |
           # 1. Execute the official Dockerized wrapper command
           ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
