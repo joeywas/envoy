@@ -19,6 +19,10 @@ jobs:
           # without breaking them down into Unix path definitions
           # MSYS_NO_PATHCONV: "1"
           COMPOSE_CONVERT_WINDOWS_PATHS: "1"
+          # CRITICAL FIX: Forces docker-compose (invoked by Envoy's script) to 
+          # use Hyper-V isolation mode and override strict kernel checking constraints.
+          COMPOSE_OPTIONS: "--isolation=hyperv"
+          DOCKER_DEFAULT_PLATFORM: "windows/amd64"
         run: |
           # 1. Translate the current drive path explicitly into a clean Unix mount layout
           # This strips out the extra 'd' directory injection fault
