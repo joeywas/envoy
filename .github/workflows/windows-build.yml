@@ -53,15 +53,24 @@ jobs:
         run: |
           export BAZEL_SH="C:/msys64/usr/bin/bash.exe"
 
-          # 1. Force Bazel to download all external dependency repositories into the local cache
+          # 1. Manually initialize the external module cache folders so the patch path exists
+          echo "Initializing target module layout directory paths..."
+          mkdir -p "C:/_b/external/envoy_toolshed+"
+          mkdir -p "C:/_b/external/envoy_toolshed+/compile"
+
+          # 2. Write a clean dummy file into the folder using a single echo string to satisfy YAML
+          echo 'filegroup(name = "compile_files", srcs = glob(["*"]), visibility = ["//visibility:public"])' > "C:/_b/external/envoy_toolshed+/compile/BUILD"
+          echo 'filegroup(name = "compile_files", srcs = glob(["*"]), visibility = ["//visibility:public"])' > "C:/_b/external/envoy_toolshed+/compile/BUILD.bazel"
+
+          # 3. Force Bazel to download all external dependency repositories into the local cache
           echo "Fetching Envoy dependencies..."
           bazel --output_base="$BAZEL_OUTPUT_BASE" fetch //source/exe:envoy-static || true
 
-          # 2. Use native POSIX paths (/c/_b/) to find and strip out any unsafe Java glob sequences
+          # 4. Use native POSIX paths (/c/_b/) to find and strip out any unsafe Java glob sequences
           echo "Sweeping external cache to replace problematic Windows glob patterns..."
           find /c/_b/external/ -type f \( -name "BUILD" -o -name "BUILD.bazel" \) -exec sed -i 's/glob(\["\*\*"\])/glob(\["\*","\*\/\*","\*\/\*\/\*"\])/g' {} + 2>/dev/null || true
 
-          # 3. Kick off the clean compilation step
+          # 5. Kick off the clean compilation step
           echo "Starting the build..."
           bazel --output_base="$BAZEL_OUTPUT_BASE" build \
             -c opt \
