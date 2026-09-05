@@ -53,24 +53,15 @@ jobs:
         run: |
           export BAZEL_SH="C:/msys64/usr/bin/bash.exe"
 
-          # 1. Ask Bazel to fetch the dependencies first so they land in the cache
+          # 1. Force Bazel to download all external dependency repositories into the local cache
           echo "Fetching Envoy dependencies..."
           bazel --output_base="$BAZEL_OUTPUT_BASE" fetch //source/exe:envoy-static || true
 
-          # 2. Directly find and replace the problematic glob(["**"]) string inside the cache
-          # This completely bypasses the Windows Java asterisks (*) crash
-          echo "Patching envoy_toolshed wildcard characters..."
-          TARGET_FILE_1=$(find C:/_b/external/ -name "BUILD" | grep "envoy_toolshed" | grep "compile" || true)
-          TARGET_FILE_2=$(find C:/_b/external/ -name "BUILD.bazel" | grep "envoy_toolshed" | grep "compile" || true)
+          # 2. Use native POSIX paths (/c/_b/) to find and strip out any unsafe Java glob sequences
+          echo "Sweeping external cache to replace problematic Windows glob patterns..."
+          find /c/_b/external/ -type f \( -name "BUILD" -o -name "BUILD.bazel" \) -exec sed -i 's/glob(\["\*\*"\])/glob(\["\*","\*\/\*","\*\/\*\/\*"\])/g' {} + 2>/dev/null || true
 
-          if [ -f "$TARGET_FILE_1" ]; then
-            sed -i 's/glob(\["\*\*"\])/glob(\["\*.*"\])/g' "$TARGET_FILE_1"
-          fi
-          if [ -f "$TARGET_FILE_2" ]; then
-            sed -i 's/glob(\["\*\*"\])/glob(\["\*.*"\])/g' "$TARGET_FILE_2"
-          fi
-
-          # 3. Fire off the actual C++ compilation
+          # 3. Kick off the clean compilation step
           echo "Starting the build..."
           bazel --output_base="$BAZEL_OUTPUT_BASE" build \
             -c opt \
