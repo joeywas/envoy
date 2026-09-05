@@ -1,10 +1,6 @@
-name: Windows Envoy Build
+name: Windows Envoy Build (GitHub-Hosted Optimization)
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+on: [push]
 
 jobs:
   build-windows:
@@ -17,11 +13,52 @@ jobs:
         run: |
           git config --global core.longpaths true
 
-      - name: Run Envoy Windows CI Build Container
-        shell: bash
-        env:
-          # This overrides the script's internal default fallback (--config=msvc-cl)
-          BAZEL_BUILD_EXTRA_OPTIONS: "--config=windows"
+      # FIX 1: Maximize runner disk space by purging massive pre-installed packages
+      - name: Free Disk Space
+        shell: powershell
         run: |
-          # Executes Envoy's native Windows building script via Docker
-          ./ci/windows_ci_steps.sh
+          Write-Host "Initial disk space:"
+          Get-PSDrive C
+          # Remove heavy standard image components not needed for Envoy C++ compilation
+          Remove-Item -Recurse -Force "C:\Program Files\Android" -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force "C:\Microsoft" -ErrorAction SilentlyContinue
+          Write-Host "Post-cleanup disk space:"
+          Get-PSDrive C
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bazelisk
+        run: |
+          choco install bazelisk
+
+      # FIX 3: Cache Bazel builds to prevent 6-hour job timeouts on weak hardware
+      - name: Bazel Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/bazel
+            C:/_bazel_runner
+          key: ${{ runner.os }}-bazel-${{ hashFiles('**/REPOSITORY.bzl', '**/*.bazelrc') }}
+          restore-keys: |
+            ${{ runner.os }}-bazel-
+
+      - name: Build Envoy Binary
+        shell: cmd
+        env:
+          BAZEL_VC: "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC"
+          # Direct Bazel to create its heavy build directory on the freshly cleared root drive
+          BAZEL_OUTPUT_BASE: "C:\\_bazel_runner"
+        run: |
+          python tools/github/write_current_source_version.py
+          
+          # FIX 2: Restrict resource consumption strictly to fit inside 7GB RAM / 2 vCPUs
+          bazel --output_base="%BAZEL_OUTPUT_BASE%" build ^
+            -c opt ^
+            --config=windows ^
+            --local_ram_resources=5120 ^
+            --local_cpu_resources=2 ^
+            --jobs=2 ^
+            //source/exe:envoy-static
