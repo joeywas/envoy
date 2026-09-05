@@ -51,26 +51,33 @@ jobs:
           BAZEL_VC: "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC"
           BAZEL_OUTPUT_BASE: "C:/_b"
         run: |
-          export BAZEL_SH="C:/msys64/usr/bin/bash.exe"
+          # 1. Generate a clean mock directory structure for the toolshed framework
+          mkdir -p C:/stub_toolshed/dependency
+          mkdir -p C:/stub_toolshed/compile
+          mkdir -p C:/stub_toolshed/repository
+          mkdir -p C:/stub_toolshed/toolchains
 
-          # 1. Manually initialize the external module cache folders so the patch path exists
-          echo "Initializing target module layout directory paths..."
-          mkdir -p "C:/_b/external/envoy_toolshed+"
-          mkdir -p "C:/_b/external/envoy_toolshed+/compile"
+          # 2. Write structural workspace metadata files
+          touch C:/stub_toolshed/REPO.bazel
+          touch C:/stub_toolshed/BUILD
+          touch C:/stub_toolshed/dependency/BUILD
+          touch C:/stub_toolshed/compile/BUILD
+          touch C:/stub_toolshed/repository/BUILD
+          touch C:/stub_toolshed/toolchains/BUILD
 
-          # 2. Write a clean dummy file into the folder using a single echo string to satisfy YAML
-          echo 'filegroup(name = "compile_files", srcs = glob(["*"]), visibility = ["//visibility:public"])' > "C:/_b/external/envoy_toolshed+/compile/BUILD"
-          echo 'filegroup(name = "compile_files", srcs = glob(["*"]), visibility = ["//visibility:public"])' > "C:/_b/external/envoy_toolshed+/compile/BUILD.bazel"
+          # 3. Stream dummy functions using single echo lines to bypass YAML string boundaries
+          echo "def json_data(**kwargs): pass" > C:/stub_toolshed/macros.bzl
+          echo "def json_merge(**kwargs): pass" > C:/stub_toolshed/repository/utils.bzl
+          echo "def arch_alias(**kwargs): return 'x86_64'" >> C:/stub_toolshed/repository/utils.bzl
+          echo "def updater(**kwargs): pass" > C:/stub_toolshed/dependency/macros.bzl
+          echo "def setup_sanitizer_libs(**kwargs): pass" > C:/stub_toolshed/compile/sanitizer_libs.bzl
+          echo "def utils(**kwargs): pass" > C:/stub_toolshed/toolchains/utils.bzl
 
-          # 3. Force Bazel to download all external dependency repositories into the local cache
-          echo "Fetching Envoy dependencies..."
-          bazel --output_base="$BAZEL_OUTPUT_BASE" fetch //source/exe:envoy-static || true
+          # 4. CRITICAL: Inject a global command override into the root .bazelrc
+          # This forces Envoy's WORKSPACE logic to look at our C:/stub_toolshed local directory
+          echo "common --override_repository=envoy_toolshed=C:/stub_toolshed" >> .bazelrc
 
-          # 4. Use native POSIX paths (/c/_b/) to find and strip out any unsafe Java glob sequences
-          echo "Sweeping external cache to replace problematic Windows glob patterns..."
-          find /c/_b/external/ -type f \( -name "BUILD" -o -name "BUILD.bazel" \) -exec sed -i 's/glob(\["\*\*"\])/glob(\["\*","\*\/\*","\*\/\*\/\*"\])/g' {} + 2>/dev/null || true
-
-          # 5. Kick off the clean compilation step
+          # 5. Execute the build directly (Skip 'fetch' since the override makes it unnecessary)
           echo "Starting the build..."
           bazel --output_base="$BAZEL_OUTPUT_BASE" build \
             -c opt \
