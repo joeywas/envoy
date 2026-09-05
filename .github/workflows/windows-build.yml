@@ -53,30 +53,29 @@ jobs:
         run: |
           export BAZEL_SH="C:/msys64/usr/bin/bash.exe"
           
-          # 1. Create a local stub directory structure for the broken repo
-          mkdir -p C:/stub_toolshed/dependency
-          mkdir -p C:/stub_toolshed/compile
-          mkdir -p C:/stub_toolshed/repository
+          # 1. Create a clean patch directory structure inside the runner
+          mkdir -p C:/patches
           
-          # 2. Write required build metadata and macro definitions
-          touch C:/stub_toolshed/BUILD
-          touch C:/stub_toolshed/dependency/BUILD
-          touch C:/stub_toolshed/compile/BUILD
-          touch C:/stub_toolshed/repository/BUILD
-          
-          # FIX: Explicitly register the module name inside the stub
-          echo 'module(name = "envoy_toolshed")' > C:/stub_toolshed/MODULE.bazel
-          
-          echo "def json_data(**kwargs): pass" > C:/stub_toolshed/macros.bzl
-          echo "def json_merge(**kwargs): pass" > C:/stub_toolshed/repository/utils.bzl
-          echo "def updater(**kwargs): pass" > C:/stub_toolshed/dependency/macros.bzl
-          echo "def setup_sanitizer_libs(**kwargs): pass" > C:/stub_toolshed/compile/sanitizer_libs.bzl
-          
-          # 3. Re-run your explicit module override build step
+          # 2. Write a Git diff patch file that replaces the invalid wildcard characters with a valid path structure
+          cat << 'EOF' > C:/patches/fix_windows_glob.patch
+diff --git a/compile/BUILD b/compile/BUILD
+index 1234567..89abcdef 100644
+--- a/compile/BUILD
++++ b/compile/BUILD
+@@ -1,5 +1,5 @@
+ filegroup(
+     name = "compile_files",
+-    srcs = glob(["**"]),
++    srcs = glob(["*"]),
+     visibility = ["//visibility:public"],
+ )
+EOF
+
+          # 3. Compile Envoy, using --patch_module to fix envoy_toolshed cleanly in transit
           bazel --output_base="$BAZEL_OUTPUT_BASE" build \
             -c opt \
             --enable_platform_specific_config \
-            --override_module=envoy_toolshed=C:/stub_toolshed \
+            --patch_module=envoy_toolshed=C:/patches/fix_windows_glob.patch \
             --local_resources=memory=5120 \
             --local_resources=cpu=2 \
             --jobs=2 \
