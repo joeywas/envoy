@@ -51,7 +51,7 @@ jobs:
           BAZEL_VC: "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC"
           BAZEL_OUTPUT_BASE: "C:/_b"
         run: |
-          python tools/github/write_current_source_version.py
+          # python tools/github/write_current_source_version.py
           export BAZEL_SH="C:/msys64/usr/bin/bash.exe"
           bazel --output_base="$BAZEL_OUTPUT_BASE" build \
             -c opt \
