@@ -53,7 +53,7 @@ jobs:
         run: |
           python tools/github/write_current_source_version.py
           export BAZEL_SH="C:/msys64/usr/bin/bash.exe"
-          bazel --output_base="%BAZEL_OUTPUT_BASE%" build \
+          bazel --output_base="$BAZEL_OUTPUT_BASE" build \
             -c opt \
             --enable_platform_specific_config \
             --local_ram_resources=5120 \
