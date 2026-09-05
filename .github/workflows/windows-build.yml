@@ -56,17 +56,19 @@ jobs:
           # 1. Create a local stub directory structure for the broken repo
           mkdir -p C:/stub_toolshed/dependency
           mkdir -p C:/stub_toolshed/compile
+          mkdir -p C:/stub_toolshed/repository
           
           # 2. Write required build metadata and macro definitions
           touch C:/stub_toolshed/BUILD
           touch C:/stub_toolshed/dependency/BUILD
           touch C:/stub_toolshed/compile/BUILD
+          touch C:/stub_toolshed/repository/BUILD
           
           # FIX: Explicitly register the module name inside the stub
           echo 'module(name = "envoy_toolshed")' > C:/stub_toolshed/MODULE.bazel
           
           echo "def json_data(**kwargs): pass" > C:/stub_toolshed/macros.bzl
-          echo "def json_merge(**kwargs): pass" > C:/stub_toolshed/utils.bzl
+          echo "def json_merge(**kwargs): pass" > C:/stub_toolshed/repository/utils.bzl
           echo "def updater(**kwargs): pass" > C:/stub_toolshed/dependency/macros.bzl
           echo "def setup_sanitizer_libs(**kwargs): pass" > C:/stub_toolshed/compile/sanitizer_libs.bzl
           
