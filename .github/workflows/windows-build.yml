@@ -52,30 +52,29 @@ jobs:
           BAZEL_OUTPUT_BASE: "C:/_b"
         run: |
           export BAZEL_SH="C:/msys64/usr/bin/bash.exe"
-          
-          # 1. Create a clean patch directory structure inside the runner
-          mkdir -p C:/patches
-          
-          # 2. Write a Git diff patch file that replaces the invalid wildcard characters with a valid path structure
-          cat << 'EOF' > C:/patches/fix_windows_glob.patch
-diff --git a/compile/BUILD b/compile/BUILD
-index 1234567..89abcdef 100644
---- a/compile/BUILD
-+++ b/compile/BUILD
-@@ -1,5 +1,5 @@
- filegroup(
-     name = "compile_files",
--    srcs = glob(["**"]),
-+    srcs = glob(["*"]),
-     visibility = ["//visibility:public"],
- )
-EOF
 
-          # 3. Compile Envoy, using --patch_module to fix envoy_toolshed cleanly in transit
+          # 1. Ask Bazel to fetch the dependencies first so they land in the cache
+          echo "Fetching Envoy dependencies..."
+          bazel --output_base="$BAZEL_OUTPUT_BASE" fetch //source/exe:envoy-static || true
+
+          # 2. Directly find and replace the problematic glob(["**"]) string inside the cache
+          # This completely bypasses the Windows Java asterisks (*) crash
+          echo "Patching envoy_toolshed wildcard characters..."
+          TARGET_FILE_1=$(find C:/_b/external/ -name "BUILD" | grep "envoy_toolshed" | grep "compile" || true)
+          TARGET_FILE_2=$(find C:/_b/external/ -name "BUILD.bazel" | grep "envoy_toolshed" | grep "compile" || true)
+
+          if [ -f "$TARGET_FILE_1" ]; then
+            sed -i 's/glob(\["\*\*"\])/glob(\["\*.*"\])/g' "$TARGET_FILE_1"
+          fi
+          if [ -f "$TARGET_FILE_2" ]; then
+            sed -i 's/glob(\["\*\*"\])/glob(\["\*.*"\])/g' "$TARGET_FILE_2"
+          fi
+
+          # 3. Fire off the actual C++ compilation
+          echo "Starting the build..."
           bazel --output_base="$BAZEL_OUTPUT_BASE" build \
             -c opt \
             --enable_platform_specific_config \
-            --patch_module=envoy_toolshed=C:/patches/fix_windows_glob.patch \
             --local_resources=memory=5120 \
             --local_resources=cpu=2 \
             --jobs=2 \
