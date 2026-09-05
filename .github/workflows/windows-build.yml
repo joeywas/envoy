@@ -15,13 +15,7 @@ jobs:
         env:
           # Fix for standard GitHub runner resources to fit within 7GB RAM
           BAZEL_BUILD_EXTRA_OPTIONS: "--local_resources=memory=5120 --local_resources=cpu=2 --jobs=2"
-          # CRITICAL: Forces MSYS2 to pass raw Windows drive paths straight to the docker CLI
-          # without breaking them down into Unix path definitions
-          # MSYS_NO_PATHCONV: "1"
           COMPOSE_CONVERT_WINDOWS_PATHS: "1"
-          # CRITICAL FIX: Forces docker-compose (invoked by Envoy's script) to 
-          # use Hyper-V isolation mode and override strict kernel checking constraints.
-          COMPOSE_OPTIONS: "--isolation=hyperv"
           DOCKER_DEFAULT_PLATFORM: "windows/amd64"
         run: |
           # 1. Translate the current drive path explicitly into a clean Unix mount layout
