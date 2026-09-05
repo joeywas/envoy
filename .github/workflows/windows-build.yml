@@ -53,15 +53,26 @@ jobs:
         run: |
           export BAZEL_SH="C:/msys64/usr/bin/bash.exe"
           
-          # 1. Force Bazel to ignore the broken directory pattern that causes the Java path crash
-          echo "external/envoy_toolshed+/compile" >> .bazelignore
-          echo "external/envoy_toolshed/compile" >> .bazelignore
+          # 1. Create a local stub directory structure for the broken repo
+          mkdir -p C:/stub_toolshed/dependency
+          mkdir -p C:/stub_toolshed/compile
           
-          # 3. Compile Envoy while overriding the broken upstream repository with our local stub
+          # 2. Write empty build files and dummy macro functions to satisfy Envoy's build system
+          touch C:/stub_toolshed/BUILD
+          touch C:/stub_toolshed/dependency/BUILD
+          touch C:/stub_toolshed/compile/BUILD
+          touch C:/stub_toolshed/MODULE.bazel
+          
+          echo "def json_data(**kwargs): pass" > C:/stub_toolshed/macros.bzl
+          echo "def json_merge(**kwargs): pass" > C:/stub_toolshed/utils.bzl
+          echo "def updater(**kwargs): pass" > C:/stub_toolshed/dependency/macros.bzl
+          echo "def setup_sanitizer_libs(**kwargs): pass" > C:/stub_toolshed/compile/sanitizer_libs.bzl
+          
+          # 3. Use --override_module to cut off the broken remote dependency completely
           bazel --output_base="$BAZEL_OUTPUT_BASE" build \
             -c opt \
             --enable_platform_specific_config \
-            --override_repository=envoy_toolshed=C:/stub_toolshed \
+            --override_module=envoy_toolshed=C:/stub_toolshed \
             --local_resources=memory=5120 \
             --local_resources=cpu=2 \
             --jobs=2 \
